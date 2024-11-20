@@ -1,6 +1,7 @@
 ﻿using System.Collections.Immutable;
 using Skylight.API.Game.Catalog;
 using Skylight.API.Game.Catalog.Products;
+using Skylight.API.Game.Users;
 
 namespace Skylight.Server.Game.Catalog;
 
@@ -46,18 +47,28 @@ internal sealed class CatalogOffer : ICatalogOffer
 		this.Products = products;
 	}
 
+	public bool CanPurchase(IUser user)
+	{
+		decimal userCredits = user.Currencies.GetBalance("skylight:credits");
+
+		return userCredits >= this.CostCredits;
+	}
+
 	public async ValueTask PurchaseAsync(ICatalogTransaction transaction, CancellationToken cancellationToken)
 	{
+		if (this.CostCredits > 0)
+		{
+			transaction.DeductCurrency("skylight:credits", this.CostCredits);
+		}
+
+		// Process the purchase of each product
 		foreach (ICatalogProduct product in this.Products)
 		{
 			ValueTask task = product.PurchaseAsync(transaction, cancellationToken);
-
-			if (task.IsCompletedSuccessfully)
+			if (!task.IsCompletedSuccessfully)
 			{
-				continue;
+				await task.ConfigureAwait(false);
 			}
-
-			await task.ConfigureAwait(false);
 		}
 	}
 }

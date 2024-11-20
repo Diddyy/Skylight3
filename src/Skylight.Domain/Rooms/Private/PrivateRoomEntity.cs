@@ -20,7 +20,7 @@ public class PrivateRoomEntity
 	public int CategoryId { get; set; }
 	public NavigatorCategoryNodeEntity? Category { get; set; }
 
-	public string[] Tags { get; set; } = null!;
+	public string[] Tags { get; set; } = [];
 
 	public PrivateRoomEntryMode EntryMode { get; set; }
 	public string? Password { get; set; }

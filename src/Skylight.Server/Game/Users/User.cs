@@ -18,16 +18,18 @@ internal sealed class User : IUser
 	public IClient Client { get; }
 	public IUserProfile Profile { get; }
 	public IUserSettings Settings { get; }
+	public IUserCurrencies Currencies { get; }
 
 	private IRoomSession? roomSession;
 
-	public User(IClient client, IUserProfile profile, IUserSettings settings)
+	public User(IClient client, IUserProfile profile, IUserSettings settings, IUserCurrencies currencies)
 	{
 		this.inventory = new UserInventory(this);
 
 		this.Client = client;
 		this.Profile = profile;
 		this.Settings = settings;
+		this.Currencies = currencies;
 	}
 
 	public IInventory Inventory => this.inventory;

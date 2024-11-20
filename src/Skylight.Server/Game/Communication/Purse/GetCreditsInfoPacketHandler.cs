@@ -12,6 +12,8 @@ internal sealed class GetCreditsInfoPacketHandler<T> : UserPacketHandler<T>
 {
 	internal override void Handle(IUser user, in T packet)
 	{
-		user.SendAsync(new CreditBalanceOutgoingPacket(999999));
+		decimal creditsBalance = user.Currencies.GetBalance("skylight:credits");
+
+		user.SendAsync(new CreditBalanceOutgoingPacket((int)creditsBalance));
 	}
 }

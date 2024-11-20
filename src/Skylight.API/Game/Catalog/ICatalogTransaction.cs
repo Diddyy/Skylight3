@@ -17,5 +17,7 @@ public interface ICatalogTransaction : IAsyncDisposable, IDisposable
 	public void AddFloorItem(IFloorFurniture furniture, JsonDocument? extraData);
 	public void AddWallItem(IWallFurniture furniture, JsonDocument? extraData);
 
+	public void DeductCurrency(string currency, decimal amount);
+
 	public Task CompleteAsync(CancellationToken cancellationToken = default);
 }

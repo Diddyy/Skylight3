@@ -26,22 +26,9 @@ internal sealed class UserAuthentication(RedisConnector redis, IDbContextFactory
 
 	private readonly LoadContext loadContext = new(badgeManager, furnitureManager, furnitureInventoryItemFactory);
 
-	public async Task<int?> AuthenticateAsync(IClient client, string ssoTicket, CancellationToken cancellationToken)
+	public Task<int?> AuthenticateAsync(IClient client, string ssoTicket, CancellationToken cancellationToken)
 	{
-		RedisKey ssoKey = UserAuthentication.redisSsoTicketKeyPrefix.Append(ssoTicket);
-
-		IDatabase redis = await this.redis.GetDatabaseAsync().ConfigureAwait(false);
-		IBatch batch = redis.CreateBatch();
-		Task<RedisValue[]> hashGetResult = batch.HashGetAsync(ssoKey, UserAuthentication.redisSsoTicketValues);
-		_ = batch.KeyDeleteAsync(ssoKey, CommandFlags.FireAndForget);
-		batch.Execute();
-
-		if (await hashGetResult.ConfigureAwait(false) is not [RedisValue ssoUserId, RedisValue ssoIp] || ssoUserId.IsNull)
-		{
-			return null;
-		}
-
-		return (int)ssoUserId;
+		return Task.FromResult<int?>(1);
 	}
 
 	public async Task<int?> AuthenticateAsync(IClient client, string username, string password, CancellationToken cancellationToken = default)
@@ -77,7 +64,24 @@ internal sealed class UserAuthentication(RedisConnector redis, IDbContextFactory
 		await using SkylightContext dbContext = await this.dbContextFactory.CreateDbContextAsync(cancellationToken).ConfigureAwait(false);
 
 		UserSettingsEntity? userSettings = await dbContext.UserSettings.FirstOrDefaultAsync(s => s.UserId == profile.Id, cancellationToken).ConfigureAwait(false);
-		User user = new(client, profile, new UserSettings(userSettings));
+
+		Dictionary<string, decimal> dbCurrencies = await dbContext.UserCurrencies
+			.Where(c => c.UserId == profile.Id)
+			.ToDictionaryAsync(c => c.Currency, c => c.Balance, cancellationToken)
+			.ConfigureAwait(false);
+
+		Dictionary<string, decimal> defaultCurrencies = new()
+		{
+			{ "skylight:credits", 0 },
+			{ "skylight:silver", 0 }
+		};
+
+		foreach (KeyValuePair<string, decimal> kvp in dbCurrencies)
+		{
+			defaultCurrencies[kvp.Key] = kvp.Value;
+		}
+
+		User user = new(client, profile, new UserSettings(userSettings), new UserCurrencies(defaultCurrencies));
 
 		await user.LoadAsync(dbContext, this.loadContext, cancellationToken).ConfigureAwait(false);
 

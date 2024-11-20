@@ -1,6 +1,7 @@
 ﻿using System.Data.Common;
 using System.Diagnostics;
 using System.Text.Json;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
 using Skylight.API.Game.Badges;
 using Skylight.API.Game.Catalog;
@@ -11,6 +12,7 @@ using Skylight.API.Game.Inventory.Items;
 using Skylight.API.Game.Users;
 using Skylight.Domain.Badges;
 using Skylight.Domain.Items;
+using Skylight.Domain.Users;
 using Skylight.Infrastructure;
 using Skylight.Server.Extensions;
 using Skylight.Server.Game.Inventory.Items.Badges;
@@ -33,6 +35,8 @@ internal sealed class CatalogTransaction : ICatalogTransaction
 
 	private List<FloorItemEntity>? floorItems;
 	private List<WallItemEntity>? wallItems;
+
+	private Dictionary<string, decimal> currencyChanges = new();
 
 	internal CatalogTransaction(IFurnitureSnapshot furnitures, IFurnitureInventoryItemStrategy furnitureInventoryItemStrategy, SkylightContext dbContext, IDbContextTransaction transaction, IUser user, string extraData)
 	{
@@ -113,8 +117,44 @@ internal sealed class CatalogTransaction : ICatalogTransaction
 		this.dbContext.Add(entity);
 	}
 
+	public void DeductCurrency(string currencyKey, decimal amount)
+	{
+		decimal currentBalance = this.user.Currencies.GetBalance(currencyKey);
+
+		if (currentBalance < amount)
+		{
+			throw new InvalidOperationException("Not enough balance to complete the purchase.");
+		}
+
+		decimal newBalance = currentBalance - amount;
+		this.user.Currencies.UpdateBalance(currencyKey, newBalance);
+
+		this.currencyChanges[currencyKey] = newBalance;
+	}
+
 	public async Task CompleteAsync(CancellationToken cancellationToken)
 	{
+		foreach (KeyValuePair<string, decimal> currency in this.currencyChanges)
+		{
+			UserCurrenciesEntity? userCurrencyEntity = await this.dbContext.UserCurrencies
+				.FirstOrDefaultAsync(c => c.UserId == this.user.Profile.Id && c.Currency == currency.Key, cancellationToken: cancellationToken).ConfigureAwait(false);
+
+			if (userCurrencyEntity != null)
+			{
+				userCurrencyEntity.Balance = currency.Value;
+				this.dbContext.UserCurrencies.Update(userCurrencyEntity);
+			}
+			else
+			{
+				await this.dbContext.UserCurrencies.AddAsync(new UserCurrenciesEntity
+				{
+					UserId = this.user.Profile.Id,
+					Currency = currency.Key,
+					Balance = currency.Value
+				}, cancellationToken).ConfigureAwait(false);
+			}
+		}
+
 		await this.dbContext.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
 		await this.transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
 	}
