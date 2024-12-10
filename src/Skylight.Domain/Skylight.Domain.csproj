@@ -4,4 +4,8 @@
 		<TargetFramework>net8.0</TargetFramework>
 	</PropertyGroup>
 
+	<ItemGroup>
+	  <PackageReference Update="Microsoft.VisualStudio.Threading.Analyzers" Version="17.12.19" />
+	</ItemGroup>
+
 </Project>

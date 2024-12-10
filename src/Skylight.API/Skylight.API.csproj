@@ -8,4 +8,8 @@
 	  <ProjectReference Include="..\submodules\Skylight.Protocol\src\Skylight.Protocol\Skylight.Protocol.csproj" />
 	</ItemGroup>
 
+	<ItemGroup>
+	  <PackageReference Update="Microsoft.VisualStudio.Threading.Analyzers" Version="17.12.19" />
+	</ItemGroup>
+
 </Project>
